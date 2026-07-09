@@ -1,0 +1,1075 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Compression-Aware NAS for Edge–Cloud Systems</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Source+Serif+4:opsz,wght@8..60,400;8..60,500;8..60,600&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:        #0e1116;
+    --bg-raised: #161b22;
+    --bg-inset:  #0a0d11;
+    --line:      #232a33;
+    --text:      #dfe3e8;
+    --text-dim:  #8a94a1;
+    --text-faint:#5b6472;
+    --amber:     #e2a545;
+    --amber-dim: #a9803f;
+    --teal:      #4fb0ac;
+    --teal-dim:  #2f6b68;
+    --red:       #d97757;
+    --serif:     'Fraunces', serif;
+    --body:      'Source Serif 4', serif;
+    --mono:      'JetBrains Mono', monospace;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{
+    margin:0; background:var(--bg); color:var(--text);
+    font-family:var(--body); line-height:1.65; font-size:17px;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background:var(--amber-dim); color:#fff; }
+
+  /* ---------- layout shell ---------- */
+  .shell{ display:grid; grid-template-columns: 300px 1fr; min-height:100vh; }
+  @media (max-width: 900px){ .shell{ grid-template-columns: 1fr; } }
+
+  /* ---------- sidebar ---------- */
+  .sidebar{
+    position:sticky; top:0; height:100vh; overflow-y:auto;
+    background:var(--bg-inset); border-right:1px solid var(--line);
+    padding:28px 0 60px;
+  }
+  @media (max-width:900px){
+    .sidebar{ position:fixed; z-index:50; width:300px; max-width:84vw;
+      transform:translateX(-100%); transition:transform .28s ease; box-shadow:0 0 40px rgba(0,0,0,.5);}
+    .sidebar.open{ transform:translateX(0); }
+  }
+  .brand{ padding:0 24px 22px; border-bottom:1px solid var(--line); margin-bottom:18px;}
+  .brand .mark{ font-family:var(--mono); font-size:11px; letter-spacing:.16em; color:var(--amber); text-transform:uppercase;}
+  .brand h1{ font-family:var(--serif); font-size:21px; font-weight:600; line-height:1.25; margin:8px 0 6px; color:#fff;}
+  .brand p{ font-size:12.5px; color:var(--text-dim); margin:0; font-family:var(--mono);}
+
+  .spine{ padding:0 12px; }
+  .phase-block{ margin-bottom:2px; }
+  .phase-head{
+    display:flex; align-items:baseline; gap:10px; width:100%;
+    background:none; border:none; color:var(--text); cursor:pointer;
+    padding:11px 12px; text-align:left; border-radius:6px; font-family:var(--body);
+  }
+  .phase-head:hover{ background:var(--bg-raised); }
+  .phase-num{ font-family:var(--mono); font-size:11px; color:var(--amber); min-width:20px;}
+  .phase-title{ font-size:14.5px; font-weight:600; color:#eef1f4; flex:1;}
+  .phase-weeks{ font-family:var(--mono); font-size:10px; color:var(--text-faint); white-space:nowrap;}
+  .steps{ list-style:none; margin:0 0 8px 0; padding:0 4px 0 40px; border-left:1px solid var(--line); margin-left:22px;}
+  .steps li{ margin:0; }
+  .steps a{
+    display:block; padding:7px 10px; font-size:13px; color:var(--text-dim);
+    text-decoration:none; border-radius:5px; font-family:var(--body);
+  }
+  .steps a:hover{ color:var(--text); background:var(--bg-raised); }
+  .steps a.active{ color:var(--amber); background:rgba(226,165,69,.08); font-weight:600; }
+
+  .sidebar-foot{ padding:20px 24px 0; margin-top:18px; border-top:1px solid var(--line); }
+  .sidebar-foot a{ display:inline-block; font-family:var(--mono); font-size:12px; color:var(--teal); text-decoration:none; }
+
+  /* mobile toggle */
+  .nav-toggle{
+    display:none; position:fixed; top:16px; left:16px; z-index:60;
+    background:var(--bg-raised); border:1px solid var(--line); color:var(--text);
+    width:40px; height:40px; border-radius:8px; font-family:var(--mono); font-size:16px; cursor:pointer;
+  }
+  @media (max-width:900px){ .nav-toggle{ display:block; } }
+  .scrim{ display:none; }
+  @media (max-width:900px){
+    .scrim.show{ display:block; position:fixed; inset:0; background:rgba(0,0,0,.5); z-index:40; }
+  }
+
+  /* ---------- main content ---------- */
+  main{ min-width:0; }
+  .page{ max-width:760px; margin:0 auto; padding:64px 40px 40px; }
+  @media (max-width:900px){ .page{ padding:80px 22px 40px; } }
+
+  /* hero */
+  .hero{ padding:96px 40px 72px; border-bottom:1px solid var(--line); position:relative; overflow:hidden;}
+  .hero::before{
+    content:""; position:absolute; inset:0;
+    background-image: radial-gradient(circle at 1px 1px, rgba(226,165,69,.12) 1px, transparent 0);
+    background-size: 26px 26px; mask-image: linear-gradient(to bottom, black, transparent 85%);
+    pointer-events:none;
+  }
+  .hero-inner{ max-width:760px; margin:0 auto; position:relative; }
+  .eyebrow{ font-family:var(--mono); font-size:12px; letter-spacing:.18em; text-transform:uppercase; color:var(--amber); margin-bottom:18px; display:flex; align-items:center; gap:10px;}
+  .eyebrow::before{ content:""; width:22px; height:1px; background:var(--amber);}
+  .hero h1{ font-family:var(--serif); font-size:clamp(34px,5vw,52px); font-weight:600; line-height:1.08; margin:0 0 20px; color:#fff; letter-spacing:-.01em;}
+  .hero .thesis{ font-size:19px; color:var(--text-dim); max-width:600px; margin:0 0 30px; }
+  .hero .thesis em{ color:var(--text); font-style:normal; border-bottom:1px solid var(--amber-dim);}
+  .stat-row{ display:flex; gap:36px; flex-wrap:wrap; margin-top:36px; }
+  .stat b{ display:block; font-family:var(--serif); font-size:26px; color:#fff; font-weight:600;}
+  .stat span{ font-family:var(--mono); font-size:11px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.08em;}
+
+  /* section chrome */
+  .kicker{ font-family:var(--mono); font-size:12px; color:var(--teal); letter-spacing:.1em; text-transform:uppercase; margin:0 0 10px;}
+  section.step{ padding-top:26px; scroll-margin-top:24px; }
+  section.step + section.step{ margin-top:64px; padding-top:0; border-top:1px solid var(--line); padding-top:56px;}
+  h2.step-title{ font-family:var(--serif); font-size:29px; font-weight:600; color:#fff; margin:0 0 6px; letter-spacing:-.01em;}
+  .step-sub{ font-family:var(--mono); font-size:12.5px; color:var(--text-faint); margin:0 0 22px;}
+  .prose p{ margin:0 0 16px; color:var(--text); }
+  .prose p:last-child{ margin-bottom:0; }
+
+  .tags{ display:flex; flex-wrap:wrap; gap:8px; margin:18px 0 22px; }
+  .tags .lbl{ font-family:var(--mono); font-size:10.5px; color:var(--text-faint); text-transform:uppercase; letter-spacing:.08em; margin-right:2px; align-self:center;}
+  .tag{ font-family:var(--mono); font-size:11.5px; color:var(--text-dim); background:var(--bg-raised); border:1px solid var(--line); padding:4px 10px; border-radius:20px; }
+
+  .concepts{ background:var(--bg-raised); border:1px solid var(--line); border-left:2px solid var(--teal-dim); border-radius:8px; padding:16px 18px; margin:20px 0; }
+  .concepts .lbl{ font-family:var(--mono); font-size:10.5px; color:var(--teal); text-transform:uppercase; letter-spacing:.08em; margin-bottom:8px;}
+  .concepts ul{ margin:0; padding-left:18px; }
+  .concepts li{ font-size:14.5px; color:var(--text-dim); margin-bottom:4px; }
+
+  /* code */
+  .code-block{ margin:20px 0 28px; border-radius:8px; overflow:hidden; border:1px solid var(--line); background:var(--bg-inset); }
+  .code-head{ display:flex; align-items:center; justify-content:space-between; padding:9px 14px; background:var(--bg-raised); border-bottom:1px solid var(--line); }
+  .code-head .fname{ font-family:var(--mono); font-size:12px; color:var(--text-dim); }
+  .code-head .dots{ display:flex; gap:5px; }
+  .code-head .dots span{ width:8px; height:8px; border-radius:50%; background:var(--line); }
+  pre{ margin:0; padding:16px 18px; overflow-x:auto; }
+  code{ font-family:var(--mono); font-size:13px; line-height:1.65; color:#c7ccd3; }
+  .tok-kw{ color:var(--red); } .tok-str{ color:#9fca7e; } .tok-com{ color:var(--text-faint); font-style:italic; }
+  .tok-num{ color:var(--amber); } .tok-def{ color:var(--teal); } .tok-cls{ color:#e7c789; }
+
+  blockquote{ margin:20px 0; padding:4px 0 4px 18px; border-left:2px solid var(--amber-dim); color:var(--text-dim); font-style:italic; }
+
+  .callout{ margin:24px 0; padding:16px 18px; border-radius:8px; background:rgba(226,165,69,.06); border:1px solid rgba(226,165,69,.25); }
+  .callout .lbl{ font-family:var(--mono); font-size:10.5px; color:var(--amber); text-transform:uppercase; letter-spacing:.08em; margin-bottom:6px;}
+  .callout p{ margin:0; font-size:14.5px; color:var(--text-dim); }
+
+  /* roadmap page */
+  .roadmap-row{ display:grid; grid-template-columns: 90px 1fr; gap:18px; padding:16px 0; border-bottom:1px solid var(--line);}
+  .roadmap-row:last-child{ border-bottom:none; }
+  .roadmap-week{ font-family:var(--mono); font-size:12px; color:var(--amber); padding-top:2px;}
+  .roadmap-body h4{ margin:0 0 4px; font-family:var(--serif); font-size:16.5px; color:#fff; font-weight:600;}
+  .roadmap-body p{ margin:0; font-size:14px; color:var(--text-dim); }
+
+  .contrib-grid{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0 6px;}
+  @media (max-width:600px){ .contrib-grid{ grid-template-columns:1fr; } }
+  .contrib-grid .card{ background:var(--bg-raised); border:1px solid var(--line); border-radius:8px; padding:16px 16px;}
+  .contrib-grid .card b{ display:block; font-family:var(--serif); color:#fff; font-size:14.5px; margin-bottom:5px; font-weight:600;}
+  .contrib-grid .card span{ font-size:13.5px; color:var(--text-dim); }
+
+  footer.page-foot{ margin-top:70px; padding-top:24px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; font-family:var(--mono); font-size:12px; color:var(--text-faint);}
+  footer.page-foot a{ color:var(--teal); text-decoration:none; }
+
+  @media (prefers-reduced-motion: reduce){ html{ scroll-behavior:auto; } }
+</style>
+</head>
+<body>
+
+<button class="nav-toggle" id="navToggle" aria-label="Toggle navigation">☰</button>
+<div class="scrim" id="scrim"></div>
+
+<div class="shell">
+
+  <!-- ============ SIDEBAR ============ -->
+  <nav class="sidebar" id="sidebar">
+    <div class="brand">
+      <div class="mark">Research Roadmap · v1</div>
+      <h1>Compression‑Aware NAS<br>for Edge–Cloud Systems</h1>
+      <p>10 steps · 7 phases · 10 weeks</p>
+    </div>
+
+    <div class="spine">
+      <div class="phase-block">
+        <a class="phase-head" href="#overview" style="text-decoration:none;">
+          <span class="phase-num">00</span><span class="phase-title">Overview</span>
+        </a>
+      </div>
+
+      <div class="phase-block">
+        <div class="phase-head"><span class="phase-num">01</span><span class="phase-title">Foundation Knowledge</span><span class="phase-weeks">wk 1–2</span></div>
+        <ul class="steps">
+          <li><a href="#step1" data-step>1 · NAS fundamentals</a></li>
+          <li><a href="#step2" data-step>2 · Model compression</a></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <div class="phase-head"><span class="phase-num">02</span><span class="phase-title">Edge–Cloud Constraints</span><span class="phase-weeks">wk 3</span></div>
+        <ul class="steps">
+          <li><a href="#step3" data-step>3 · Edge–cloud systems</a></li>
+          <li><a href="#step4" data-step>4 · Multi‑objective optimization</a></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <div class="phase-head"><span class="phase-num">03</span><span class="phase-title">Distributed Simulation</span><span class="phase-weeks">wk 5–6</span></div>
+        <ul class="steps">
+          <li><a href="#step5" data-step>5 · Simulation framework</a></li>
+          <li><a href="#step6" data-step>6 · Compression‑aware NAS</a></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <div class="phase-head"><span class="phase-num">04</span><span class="phase-title">Adaptation Mechanisms</span><span class="phase-weeks">wk 7</span></div>
+        <ul class="steps">
+          <li><a href="#step7" data-step>7 · Dynamic adaptation</a></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <div class="phase-head"><span class="phase-num">05</span><span class="phase-title">Integration &amp; Evaluation</span><span class="phase-weeks">wk 8</span></div>
+        <ul class="steps">
+          <li><a href="#step8" data-step>8 · The integrated system</a></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <div class="phase-head"><span class="phase-num">06</span><span class="phase-title">Benchmarking</span><span class="phase-weeks">wk 9</span></div>
+        <ul class="steps">
+          <li><a href="#step9" data-step>9 · Standard benchmarks</a></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <div class="phase-head"><span class="phase-num">07</span><span class="phase-title">QoS–QoE Integration</span><span class="phase-weeks">wk 10</span></div>
+        <ul class="steps">
+          <li><a href="#step10" data-step>10 · Quality of Experience</a></li>
+        </ul>
+      </div>
+
+      <div class="phase-block">
+        <a class="phase-head" href="#roadmap" style="text-decoration:none;">
+          <span class="phase-num">08</span><span class="phase-title">Roadmap &amp; Contributions</span>
+        </a>
+      </div>
+    </div>
+
+    <div class="sidebar-foot">
+      <a href="#overview">↑ back to top</a>
+    </div>
+  </nav>
+
+  <!-- ============ MAIN ============ -->
+  <main>
+
+    <header class="hero" id="overview">
+      <div class="hero-inner">
+        <div class="eyebrow">Research build log</div>
+        <h1>Neural Architecture Search, priced&nbsp;in FLOPs, memory,&nbsp;and milliseconds.</h1>
+        <p class="thesis">
+          This book is a working plan for a single research thread: <em>architectures that are searched for, compressed,
+          and deployed with edge–cloud resource limits treated as first‑class objectives</em> — not applied afterward as
+          an afterthought. Every phase below pairs the concepts worth reading about with the code that turns them into
+          a running system.
+        </p>
+        <div class="stat-row">
+          <div class="stat"><b>10</b><span>build steps</span></div>
+          <div class="stat"><b>7</b><span>phases</span></div>
+          <div class="stat"><b>4</b><span>objectives tracked</span></div>
+          <div class="stat"><b>10 wks</b><span>suggested pace</span></div>
+        </div>
+      </div>
+    </header>
+
+    <div class="page">
+
+      <div class="prose" style="margin-bottom:8px;">
+        <p>
+          The plan is organized the way the system itself is organized: start with a search algorithm that knows
+          nothing about resource limits, then teach it about compression, then about the two-tier world it will
+          actually run in, then about the tradeoffs between all of those things at once. By the last phase the same
+          object — an <code style="font-family:var(--mono);color:var(--amber);">architecture</code> — carries an
+          accuracy score, a compression ratio, an edge‑tier cost, a cloud‑tier cost, and a user‑facing quality
+          estimate, all computed by pieces built in earlier steps.
+        </p>
+      </div>
+
+      <!-- ================= STEP 1 ================= -->
+      <section class="step" id="step1">
+        <p class="kicker">Phase 01 · Foundation Knowledge Building</p>
+        <h2 class="step-title">1 · Understanding NAS Fundamentals</h2>
+        <p class="step-sub">search space → search strategy → performance estimation</p>
+        <div class="prose">
+          <p>
+            Neural Architecture Search automates the part of model design that used to be manual trial and error:
+            choosing depth, width, and operator types. Every NAS method, however sophisticated, is answering three
+            questions — what architectures are allowed (the search space), how the space gets explored (the search
+            strategy), and how a candidate gets scored without paying the full cost of training it (the performance
+            estimation strategy). Random search is the right place to start precisely because it isolates those
+            three pieces without an optimizer's machinery in the way.
+          </p>
+        </div>
+        <div class="tags">
+          <span class="lbl">Read first</span>
+          <span class="tag">Neural Architecture Search</span><span class="tag">AutoML</span>
+          <span class="tag">Evolutionary algorithms</span><span class="tag">Reinforcement learning</span>
+        </div>
+        <div class="concepts">
+          <div class="lbl">Key concepts</div>
+          <ul>
+            <li><b>Search space</b> — the set of architectures that can be represented at all</li>
+            <li><b>Search strategy</b> — how the space is explored (random, evolutionary, RL, gradient‑based)</li>
+            <li><b>Performance estimation</b> — how a candidate is scored cheaply (proxy accuracy, early stopping, weight sharing)</li>
+          </ul>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">simple_nas.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py"># Simple random NAS on MNIST
+import random
+import tensorflow as tf
+
+class SimpleNAS:
+    def __init__(self):
+        self.search_space = {
+            'num_layers': [2, 3, 4],
+            'filters': [32, 64, 128],
+            'kernel_size': [3, 5]
+        }
+
+    def random_search(self, num_samples=10):
+        best_arch = None
+        best_acc = 0
+
+        for i in range(num_samples):
+            arch = {
+                'num_layers': random.choice(self.search_space['num_layers']),
+                'filters': random.choice(self.search_space['filters']),
+                'kernel_size': random.choice(self.search_space['kernel_size'])
+            }
+            acc = self.evaluate_architecture(arch)
+            if acc > best_acc:
+                best_acc = acc
+                best_arch = arch
+
+        return best_arch, best_acc</code></pre>
+        </div>
+        <div class="callout">
+          <div class="lbl">Why start here</div>
+          <p>Random search has no hyperparameters to tune and no failure modes to debug. It exists to validate the
+          evaluation loop — <code style="font-family:var(--mono);">evaluate_architecture</code> — that every later,
+          smarter search strategy will reuse unchanged.</p>
+        </div>
+      </section>
+
+      <!-- ================= STEP 2 ================= -->
+      <section class="step" id="step2">
+        <p class="kicker">Phase 01 · Foundation Knowledge Building</p>
+        <h2 class="step-title">2 · Model Compression Techniques</h2>
+        <p class="step-sub">pruning → quantization → distillation</p>
+        <div class="prose">
+          <p>
+            Compression is what turns a model that scores well into a model that <em style="color:var(--text);font-style:normal;border-bottom:1px solid var(--amber-dim);">fits</em>.
+            Pruning removes weights or whole channels judged unimportant by some criterion (here, L1 norm).
+            Quantization reduces numeric precision — often from 32‑bit floats to 8‑bit integers — trading a small
+            accuracy cost for large memory and latency wins. Knowledge distillation trains a small "student" network
+            to mimic a large "teacher," transferring behavior rather than weights. None of these are exclusive; the
+            later compression‑aware search step treats them as a menu of operators applied to a candidate architecture.
+          </p>
+        </div>
+        <div class="tags">
+          <span class="lbl">Read first</span>
+          <span class="tag">Pruning (neural networks)</span><span class="tag">Quantization (neural networks)</span>
+          <span class="tag">Knowledge distillation</span><span class="tag">Model compression</span>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">compression.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py"># Channel pruning example
+class ChannelPruning:
+    def prune_channels(self, model, pruning_ratio=0.3):
+        """Prune channels based on L1 norm of weights"""
+        pruned_model = model.clone()
+        for layer in pruned_model.conv_layers:
+            # Calculate importance scores
+            importance = torch.norm(layer.weight, p=1, dim=[1,2,3])
+            # Keep top-k channels
+            k = int(len(importance) * (1 - pruning_ratio))
+            top_channels = torch.topk(importance, k).indices
+            layer.weight = layer.weight[top_channels]
+        return pruned_model
+
+# Quantization example
+def apply_quantization(model, bits=8):
+    """Simple uniform quantization"""
+    import torch.quantization as quant
+
+    model.qconfig = quant.get_default_qconfig('fbgemm')
+    quant.prepare(model, inplace=True)
+    quant.convert(model, inplace=True)
+    return model</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= STEP 3 ================= -->
+      <section class="step" id="step3">
+        <p class="kicker">Phase 02 · Edge–Cloud Constraints Integration</p>
+        <h2 class="step-title">3 · Understanding Edge–Cloud Systems</h2>
+        <p class="step-sub">two tiers, two budgets</p>
+        <div class="prose">
+          <p>
+            An edge device and a cloud server are not the same computer with different specs — they represent
+            different budgets for the same four resources: compute (FLOPs), memory, latency, and energy. Modeling
+            both tiers explicitly, rather than assuming "cloud‑sized" compute everywhere, is what makes later search
+            results deployable rather than theoretical. The constraint check below is deliberately simple: a
+            candidate architecture either fits a tier's budget or it doesn't.
+          </p>
+        </div>
+        <div class="tags">
+          <span class="lbl">Read first</span>
+          <span class="tag">Edge computing</span><span class="tag">Fog computing</span>
+          <span class="tag">Cloud computing</span><span class="tag">Distributed computing</span>
+          <span class="tag">Mobile edge computing</span>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">constraints.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">class EdgeCloudConstraints:
+    def __init__(self):
+        self.constraints = {
+            'edge': {
+                'max_flops': 1e9,       # 1 GFLOP
+                'max_memory': 512e6,    # 512 MB
+                'max_latency': 10e-3,   # 10 ms
+                'energy_budget': 1.0    # 1 Joule
+            },
+            'cloud': {
+                'max_flops': 100e9,     # 100 GFLOP
+                'max_memory': 16e9,     # 16 GB
+                'max_latency': 100e-3,  # 100 ms
+                'energy_budget': 100.0  # 100 Joules
+            }
+        }
+
+    def check_viability(self, architecture, tier='edge'):
+        """Check if architecture meets tier constraints"""
+        arch_cost = self.estimate_cost(architecture)
+        constraints = self.constraints[tier]
+
+        return (arch_cost['flops'] <= constraints['max_flops'] and
+                arch_cost['memory'] <= constraints['max_memory'] and
+                arch_cost['latency'] <= constraints['max_latency'])</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= STEP 4 ================= -->
+      <section class="step" id="step4">
+        <p class="kicker">Phase 02 · Edge–Cloud Constraints Integration</p>
+        <h2 class="step-title">4 · Multi‑Objective Optimization</h2>
+        <p class="step-sub">accuracy vs. flops vs. memory vs. latency</p>
+        <div class="prose">
+          <p>
+            Once accuracy is one objective among several, "best" stops being a single number. Pareto dominance gives
+            a rigorous replacement: architecture A dominates B only if A is at least as good on every objective and
+            strictly better on one. The set of non‑dominated solutions — the Pareto front — is the honest output of
+            a multi‑objective search: a menu of real tradeoffs rather than one winner.
+          </p>
+        </div>
+        <div class="tags">
+          <span class="lbl">Read first</span>
+          <span class="tag">Pareto optimality</span><span class="tag">Multi-objective optimization</span>
+          <span class="tag">NSGA-II algorithm</span><span class="tag">Constraint satisfaction problems</span>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">pareto.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">class MultiObjectiveNAS:
+    def __init__(self):
+        self.objectives = ['accuracy', 'flops', 'memory', 'latency']
+
+    def pareto_dominance(self, solution_a, solution_b):
+        """Check if solution_a dominates solution_b"""
+        # We want to maximize accuracy, minimize others
+        better_in_one = False
+
+        # Check accuracy (higher is better)
+        if solution_a['accuracy'] > solution_b['accuracy']:
+            better_in_one = True
+        elif solution_a['accuracy'] < solution_b['accuracy']:
+            return False
+
+        # Check costs (lower is better)
+        for obj in ['flops', 'memory', 'latency']:
+            if solution_a[obj] > solution_b[obj]:
+                return False
+            elif solution_a[obj] < solution_b[obj]:
+                better_in_one = True
+
+        return better_in_one
+
+    def find_pareto_front(self, solutions):
+        """Extract Pareto-optimal solutions"""
+        pareto_front = []
+        for i, sol_a in enumerate(solutions):
+            dominated = False
+            for j, sol_b in enumerate(solutions):
+                if i != j and self.pareto_dominance(sol_b, sol_a):
+                    dominated = True
+                    break
+            if not dominated:
+                pareto_front.append(sol_a)
+        return pareto_front</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= STEP 5 ================= -->
+      <section class="step" id="step5">
+        <p class="kicker">Phase 03 · Distributed System Simulation</p>
+        <h2 class="step-title">5 · Building the Simulation Framework</h2>
+        <p class="step-sub">discrete-event simulation of edge nodes, cloud, and the network between them</p>
+        <div class="prose">
+          <p>
+            Real edge fleets are expensive to prototype against. A discrete‑event simulator built on
+            <code style="font-family:var(--mono);color:var(--amber);">simpy</code> stands in: edge nodes queue and
+            process requests with a single‑slot resource, a network model injects realistic transfer latency between
+            tiers, and a metrics collector accumulates everything the evaluation phase will later need. This is the
+            substrate every subsequent phase runs on top of.
+          </p>
+        </div>
+        <div class="tags">
+          <span class="lbl">Read first</span>
+          <span class="tag">Discrete-event simulation</span><span class="tag">Queueing theory</span>
+          <span class="tag">Network latency</span>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">simulator.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">import simpy
+import numpy as np
+
+class EdgeCloudSimulator:
+    def __init__(self):
+        self.env = simpy.Environment()
+        self.edge_nodes = []
+        self.cloud_resources = []
+        self.network = NetworkModel()
+        self.metrics_collector = MetricsCollector()
+
+    def add_edge_node(self, compute_power, memory, energy):
+        node = EdgeNode(self.env, compute_power, memory, energy)
+        self.edge_nodes.append(node)
+        return node
+
+    def run_simulation(self, duration):
+        self.env.run(until=duration)
+        return self.metrics_collector.get_summary()
+
+class EdgeNode:
+    def __init__(self, env, compute_power, memory, energy):
+        self.env = env
+        self.compute_power = compute_power  # FLOPS
+        self.memory = memory                # bytes
+        self.energy = energy                # Watts
+        self.queue = simpy.Resource(env, capacity=1)
+        self.metrics = []
+
+    def process_request(self, request):
+        with self.queue.request() as req:
+            yield req
+            # Simulate processing time
+            processing_time = self.estimate_time(request)
+            yield self.env.timeout(processing_time)
+            return self.execute(request)
+
+class NetworkModel:
+    def __init__(self):
+        self.edge_to_edge_latency = (5e-3, 10e-3)      # 5-10ms
+        self.edge_to_cloud_latency = (50e-3, 100e-3)   # 50-100ms
+        self.bandwidth = 100e6  # 100 Mbps
+
+    def transfer_data(self, data_size):
+        latency = np.random.uniform(*self.edge_to_cloud_latency)
+        transfer_time = data_size / self.bandwidth
+        return latency + transfer_time</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= STEP 6 ================= -->
+      <section class="step" id="step6">
+        <p class="kicker">Phase 03 · Distributed System Simulation</p>
+        <h2 class="step-title">6 · NAS with Compression-Awareness</h2>
+        <p class="step-sub">where search, compression, and simulation meet</p>
+        <div class="prose">
+          <p>
+            This is the hinge of the whole system. Every candidate architecture is now run through each compression
+            operator from Step 2, and each compressed variant is evaluated on <em style="color:var(--text);font-style:normal;">both</em>
+            simulated tiers from Step 5. The result is a table of architecture × compression × tier combinations,
+            each with its own Pareto score — a single scalar that blends accuracy, resource efficiency, latency, and
+            energy so that candidates can be ranked without discarding the underlying multi‑objective detail.
+          </p>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">compression_aware_nas.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">class CompressionAwareNAS:
+    def __init__(self, simulator):
+        self.simulator = simulator
+        self.compression_operators = [
+            ChannelPruning(),
+            WeightPruning(),
+            Quantization(bits=8),
+            KnowledgeDistillation()
+        ]
+
+    def evaluate_architecture_with_compression(self, architecture):
+        """Evaluate architecture-performance-compression tradeoffs"""
+        results = []
+
+        # Base model evaluation
+        base_metrics = self.evaluate_base_model(architecture)
+
+        for compression_op in self.compression_operators:
+            compressed_model = compression_op.apply(architecture)
+
+            # Evaluate on edge
+            edge_metrics = self.simulator.simulate_execution(
+                compressed_model,
+                tier='edge'
+            )
+
+            # Evaluate on cloud
+            cloud_metrics = self.simulator.simulate_execution(
+                compressed_model,
+                tier='cloud'
+            )
+
+            results.append({
+                'architecture': architecture,
+                'compression': compression_op.name,
+                'compression_ratio': compression_op.compression_ratio,
+                'edge_metrics': edge_metrics,
+                'cloud_metrics': cloud_metrics,
+                'pareto_score': self.calculate_pareto_score(edge_metrics, cloud_metrics)
+            })
+
+        return results
+
+    def calculate_pareto_score(self, edge_metrics, cloud_metrics):
+        """Multi-objective scoring considering both edge and cloud performance"""
+        score = 0
+        # Accuracy maintained
+        score += edge_metrics['accuracy'] * 0.4
+        # Resource efficiency on edge
+        score += (1 - edge_metrics['resource_usage']) * 0.3
+        # Latency optimization
+        score += (1 - edge_metrics['latency'] / edge_metrics['latency_budget']) * 0.2
+        # Energy efficiency
+        score += (1 - edge_metrics['energy'] / edge_metrics['energy_budget']) * 0.1
+        return score</code></pre>
+        </div>
+        <div class="callout">
+          <div class="lbl">Weighting note</div>
+          <p>The 0.4 / 0.3 / 0.2 / 0.1 split above is a starting default, not a finding — treat it as the first
+          knob to sensitivity‑test once the pipeline runs end to end.</p>
+        </div>
+      </section>
+
+      <!-- ================= STEP 7 ================= -->
+      <section class="step" id="step7">
+        <p class="kicker">Phase 04 · Adaptation Mechanisms</p>
+        <h2 class="step-title">7 · Dynamic Adaptation System</h2>
+        <p class="step-sub">picking a model at runtime, not just at design time</p>
+        <div class="prose">
+          <p>
+            A search process picks architectures once, offline. A deployed system faces conditions that change
+            minute to minute — battery draining, bandwidth dropping, memory pressure rising. The adaptation layer
+            closes that gap: a context monitor samples device and network state, and a decision engine maps that
+            state onto one of several pre‑registered models (ultra‑low‑power, memory‑efficient, edge‑heavy,
+            balanced) rather than trying to re‑run search live.
+          </p>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">adaptation.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">class AdaptiveDeployment:
+    def __init__(self):
+        self.context_monitor = ContextMonitor()
+        self.model_registry = ModelRegistry()
+        self.decision_engine = DecisionEngine()
+
+    def adapt_to_context(self, current_context):
+        """Dynamically select/adapt model based on context"""
+        context = self.context_monitor.get_context()
+
+        # Check resource availability
+        available_resources = {
+            'edge_compute': context['edge_cpu_available'],
+            'edge_memory': context['edge_memory_available'],
+            'bandwidth': context['network_bandwidth'],
+            'battery': context['battery_level']
+        }
+
+        # Decision logic for model selection
+        if available_resources['battery'] < 0.2:
+            return self.model_registry.get_ultra_low_power_model()
+        elif available_resources['edge_memory'] < 100e6:
+            return self.model_registry.get_memory_efficient_model()
+        elif available_resources['bandwidth'] < 1e6:
+            return self.model_registry.get_edge_heavy_model()
+        else:
+            return self.model_registry.get_balanced_model()
+
+class ContextMonitor:
+    def __init__(self):
+        self.metrics_history = []
+
+    def get_context(self):
+        return {
+            'edge_cpu_available': self.measure_cpu_availability(),
+            'edge_memory_available': self.measure_memory_availability(),
+            'network_bandwidth': self.measure_bandwidth(),
+            'battery_level': self.measure_battery(),
+            'workload_intensity': self.measure_workload(),
+            'data_distribution': self.measure_data_drift()
+        }</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= STEP 8 ================= -->
+      <section class="step" id="step8">
+        <p class="kicker">Phase 05 · Integrated System and Evaluation</p>
+        <h2 class="step-title">8 · Putting It All Together</h2>
+        <p class="step-sub">the end-to-end experiment loop</p>
+        <div class="prose">
+          <p>
+            Everything from Steps 1–7 becomes a single orchestrator here: set up the simulated environment, run
+            compression‑aware NAS under constraints, then evaluate each discovered architecture two ways — as a
+            static deployment and as an adaptively‑deployed one — so the report can quantify exactly how much the
+            adaptation layer from Step 7 is worth.
+          </p>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">system.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">class EdgeCloudNASSystem:
+    def __init__(self):
+        self.simulator = EdgeCloudSimulator()
+        self.nas_engine = CompressionAwareNAS(self.simulator)
+        self.adaptation = AdaptiveDeployment()
+        self.metrics = PerformanceEvaluator()
+
+    def run_experiment(self, config):
+        """End-to-end experiment execution"""
+        results = []
+
+        # Setup simulation environment
+        self.setup_simulation(config['environment'])
+
+        # Run NAS with compression constraints
+        architectures = self.nas_engine.search(
+            search_space=config['search_space'],
+            constraints=config['constraints'],
+            num_iterations=config['nas_iterations']
+        )
+
+        # Evaluate found architectures
+        for arch in architectures:
+            # Static evaluation
+            static_metrics = self.evaluate_static_deployment(arch)
+
+            # Adaptive evaluation
+            adaptive_metrics = self.evaluate_adaptive_deployment(arch)
+
+            results.append({
+                'architecture': arch,
+                'static_performance': static_metrics,
+                'adaptive_performance': adaptive_metrics,
+                'compression_impact': self.analyze_compression_impact(arch),
+                'edge_cloud_tradeoff': self.analyze_tradeoffs(arch)
+            })
+
+        return self.generate_report(results)
+
+class PerformanceEvaluator:
+    def __init__(self):
+        self.metrics = {
+            'system': ['throughput', 'latency', 'scalability'],
+            'model': ['flops', 'memory', 'inference_time', 'accuracy'],
+            'qos': ['availability', 'reliability', 'user_satisfaction'],
+            'security': ['data_breach_freq', 'encryption_strength']
+        }
+
+    def evaluate_system_performance(self, deployment_results):
+        """Evaluate system-level metrics"""
+        return {
+            'throughput': self.calculate_throughput(deployment_results),
+            'latency': self.calculate_cross_tier_latency(deployment_results),
+            'scalability': self.measure_scalability(deployment_results),
+            'accuracy_vs_efficiency': self.plot_pareto_frontier(deployment_results)
+        }
+
+    def calculate_cross_tier_latency(self, results):
+        """Analyze latency across edge-cloud tiers"""
+        edge_latency = np.mean([r['edge_latency'] for r in results])
+        cloud_latency = np.mean([r['cloud_latency'] for r in results])
+        transfer_latency = np.mean([r['transfer_latency'] for r in results])
+
+        return {
+            'edge_processing': edge_latency,
+            'cloud_processing': cloud_latency,
+            'data_transfer': transfer_latency,
+            'total': edge_latency + cloud_latency + transfer_latency,
+            'breakdown_percentages': {
+                'edge': edge_latency / (edge_latency + cloud_latency + transfer_latency),
+                'cloud': cloud_latency / (edge_latency + cloud_latency + transfer_latency),
+                'transfer': transfer_latency / (edge_latency + cloud_latency + transfer_latency)
+            }
+        }</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= STEP 9 ================= -->
+      <section class="step" id="step9">
+        <p class="kicker">Phase 06 · Benchmarking and Validation</p>
+        <h2 class="step-title">9 · Implement Standard Benchmarks</h2>
+        <p class="step-sub">checking results against external, scenario-driven suites</p>
+        <div class="prose">
+          <p>
+            Internal metrics can drift from what matters in practice, so results get cross‑checked against named
+            benchmark suites with scenario‑specific constraints — ICU monitoring demands five‑nines reliability and
+            HIPAA‑grade privacy at 5&nbsp;ms latency; autonomous‑vehicle perception demands 1&nbsp;ms latency and a
+            fail‑safe mode. These aren't arbitrary numbers — they're the kind of hard constraint that separates a
+            publishable system from a lab demo.
+          </p>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">benchmarks.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">class BenchmarkSuite:
+    def __init__(self):
+        self.benchmarks = {
+            'edge_aibench': EdgeAIBench(),
+            'edgebench': EdgeBench(),
+            'kheops': KheOps()
+        }
+
+    def run_benchmarks(self, system, datasets):
+        results = {}
+
+        for name, benchmark in self.benchmarks.items():
+            results[name] = benchmark.evaluate(system, datasets[name])
+
+        return self.compare_results(results)
+
+    def compare_results(self, results):
+        """Cross-benchmark comparison"""
+        comparison = {}
+        metrics = ['accuracy', 'latency', 'energy', 'memory']
+
+        for metric in metrics:
+            comparison[metric] = {
+                bench: results[bench][metric]
+                for bench in results.keys()
+            }
+
+        return comparison
+
+class EdgeAIBench:
+    def __init__(self):
+        self.scenarios = ['icu_monitoring', 'autonomous_vehicles']
+
+    def evaluate(self, system, dataset):
+        results = {}
+        for scenario in self.scenarios:
+            # Setup scenario-specific constraints
+            constraints = self.get_scenario_constraints(scenario)
+            # Run evaluation
+            results[scenario] = system.evaluate(dataset, constraints)
+        return results
+
+    def get_scenario_constraints(self, scenario):
+        if scenario == 'icu_monitoring':
+            return {
+                'max_latency': 5e-3,     # 5ms for real-time monitoring
+                'reliability': 0.9999,   # 99.99% uptime
+                'privacy_level': 'high'  # HIPAA compliance
+            }
+        elif scenario == 'autonomous_vehicles':
+            return {
+                'max_latency': 1e-3,      # 1ms for safety-critical
+                'reliability': 0.99999,   # 99.999% uptime
+                'fail_safe': True
+            }</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= STEP 10 ================= -->
+      <section class="step" id="step10">
+        <p class="kicker">Phase 07 · QoS–QoE Integration</p>
+        <h2 class="step-title">10 · Quality of Experience Framework</h2>
+        <p class="step-sub">from measured system metrics to felt user experience</p>
+        <div class="prose">
+          <p>
+            The final layer translates system‑side Quality of Service numbers — availability, latency, reliability —
+            into the Quality of Experience a person actually feels. An exponential decay model captures the
+            intuition that perceived quality degrades sharply past some latency threshold rather than linearly, and
+            correlation analysis against user‑satisfaction data locates that threshold empirically instead of
+            guessing it.
+          </p>
+        </div>
+        <div class="code-block">
+          <div class="code-head"><span class="fname">qos_qoe.py</span><span class="dots"><span></span><span></span><span></span></span></div>
+          <pre><code data-lang="py">class QoSEvaluator:
+    def __init__(self):
+        self.qos_metrics = ['availability', 'reliability', 'response_time']
+        self.qoe_metrics = ['user_satisfaction', 'perceived_quality', 'usability']
+
+    def evaluate_qos_qoe_relationship(self, system_results):
+        """Map QoS metrics to QoE outcomes"""
+        relationships = {}
+
+        # Availability vs User Satisfaction
+        availability = system_results['availability']
+        user_satisfaction = self.simulate_user_satisfaction(availability)
+
+        # Latency vs Perceived Quality
+        latency = system_results['latency']
+        perceived_quality = self.model_perceived_quality(latency)
+
+        # Reliability vs Usability
+        reliability = system_results['reliability']
+        usability = self.calculate_usability_score(reliability)
+
+        return {
+            'availability_satisfaction': {
+                'correlation': np.corrcoef(availability, user_satisfaction)[0,1],
+                'threshold': self.find_satisfaction_threshold(availability, user_satisfaction)
+            },
+            'latency_quality': {
+                'model': self.fit_qoe_model(latency, perceived_quality),
+                'acceptable_latency': self.find_acceptable_threshold(latency, perceived_quality, 0.8)
+            },
+            'reliability_usability': {
+                'mapping_function': self.create_mapping(reliability, usability),
+                'critical_points': self.find_critical_points(reliability, usability)
+            }
+        }
+
+    def model_perceived_quality(self, latency):
+        """QoE model: perceived quality decreases with latency"""
+        # Exponential decay model for perceived quality
+        base_quality = 1.0
+        decay_rate = 0.1
+        return base_quality * np.exp(-decay_rate * latency)</code></pre>
+        </div>
+      </section>
+
+      <!-- ================= ROADMAP ================= -->
+      <section class="step" id="roadmap">
+        <p class="kicker">Closing</p>
+        <h2 class="step-title">Roadmap &amp; Research Contributions</h2>
+        <p class="step-sub">suggested pace and what to validate against</p>
+
+        <div class="prose"><p>A ten‑week build order, front‑loading the pieces every later phase depends on:</p></div>
+        <div style="margin:20px 0 34px;">
+          <div class="roadmap-row">
+            <div class="roadmap-week">WK 1–2</div>
+            <div class="roadmap-body"><h4>SimpleNAS</h4><p>Get the random‑search evaluation loop running end to end on a toy dataset before adding any intelligence.</p></div>
+          </div>
+          <div class="roadmap-row">
+            <div class="roadmap-week">WK 3–4</div>
+            <div class="roadmap-body"><h4>Compression operators</h4><p>Add pruning, quantization, and distillation as interchangeable operators over any candidate architecture.</p></div>
+          </div>
+          <div class="roadmap-row">
+            <div class="roadmap-week">WK 5–6</div>
+            <div class="roadmap-body"><h4>Simulator framework</h4><p>Stand up the edge/cloud/network discrete‑event model that every later evaluation call depends on.</p></div>
+          </div>
+          <div class="roadmap-row">
+            <div class="roadmap-week">WK 7–8</div>
+            <div class="roadmap-body"><h4>Adaptation + integration</h4><p>Add the context‑aware model‑selection layer, then wire search, compression, simulation, and adaptation into one experiment loop.</p></div>
+          </div>
+          <div class="roadmap-row">
+            <div class="roadmap-week">WK 9–10</div>
+            <div class="roadmap-body"><h4>Benchmarking &amp; evaluation</h4><p>Cross‑check against named external suites and layer the QoS→QoE model on top of the results.</p></div>
+          </div>
+        </div>
+
+        <div class="prose"><p>Target research contributions worth aiming the write‑up at:</p></div>
+        <div class="contrib-grid">
+          <div class="card"><b>Search strategy</b><span>Novel compression‑aware NAS search strategies</span></div>
+          <div class="card"><b>Experience modeling</b><span>QoS–QoE mapping models for edge–cloud systems</span></div>
+          <div class="card"><b>Latency</b><span>Cross‑tier latency optimization techniques</span></div>
+          <div class="card"><b>Deployment</b><span>Adaptive deployment algorithms</span></div>
+        </div>
+
+        <div class="prose" style="margin-top:28px;"><p>Validation strategy:</p></div>
+        <div class="concepts">
+          <ul>
+            <li>Compare against random search and grid search baselines</li>
+            <li>Ablation studies on each compression operator</li>
+            <li>Stress test under varying network conditions</li>
+            <li>Real‑world edge device validation (Raspberry Pi, Jetson Nano)</li>
+          </ul>
+        </div>
+
+        <blockquote>
+          Each component builds on the previous one — the plan is designed so incremental results can be published
+          along the way, not only at the end.
+        </blockquote>
+      </section>
+
+      <footer class="page-foot">
+        <span>Compression‑Aware NAS · research build log</span>
+        <a href="#overview">back to overview ↑</a>
+      </footer>
+
+    </div>
+  </main>
+</div>
+
+<script>
+  // ---- mobile nav toggle ----
+  const sidebar = document.getElementById('sidebar');
+  const toggle = document.getElementById('navToggle');
+  const scrim = document.getElementById('scrim');
+  function closeNav(){ sidebar.classList.remove('open'); scrim.classList.remove('show'); }
+  toggle.addEventListener('click', () => {
+    sidebar.classList.toggle('open');
+    scrim.classList.toggle('show');
+  });
+  scrim.addEventListener('click', closeNav);
+  sidebar.querySelectorAll('a').forEach(a => a.addEventListener('click', closeNav));
+
+  // ---- active step highlighting ----
+  const stepLinks = Array.from(document.querySelectorAll('[data-step]'));
+  const sections = stepLinks.map(a => document.querySelector(a.getAttribute('href'))).filter(Boolean);
+  const io = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const id = '#' + entry.target.id;
+      const link = stepLinks.find(a => a.getAttribute('href') === id);
+      if(!link) return;
+      if(entry.isIntersecting){
+        stepLinks.forEach(l => l.classList.remove('active'));
+        link.classList.add('active');
+      }
+    });
+  }, { rootMargin: '-15% 0px -70% 0px', threshold: 0 });
+  sections.forEach(s => io.observe(s));
+
+  // ---- tiny python syntax highlighter ----
+  const KEYWORDS = ['def','class','return','if','elif','else','for','while','in','import','from','as','self','yield','with','try','except','pass','True','False','None','and','or','not','is','lambda'];
+  function highlight(code){
+    const lines = code.split('\n');
+    return lines.map(line => {
+      // comment
+      const commentIdx = line.indexOf('#');
+      let codePart = line, commentPart = '';
+      if(commentIdx !== -1){
+        codePart = line.slice(0, commentIdx);
+        commentPart = line.slice(commentIdx);
+      }
+      let escaped = codePart
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      // strings
+      escaped = escaped.replace(/('([^'\\]|\\.)*'|"([^"\\]|\\.)*")/g, m => `<span class="tok-str">${m}</span>`);
+      // numbers
+      escaped = escaped.replace(/\b(\d+\.?\d*e?-?\d*)\b/g, m => `<span class="tok-num">${m}</span>`);
+      // keywords
+      escaped = escaped.replace(new RegExp('\\b(' + KEYWORDS.join('|') + ')\\b', 'g'), m => `<span class="tok-kw">${m}</span>`);
+      // class / def names
+      escaped = escaped.replace(/<span class="tok-kw">class<\/span> (\w+)/g, (m, name) => `<span class="tok-kw">class</span> <span class="tok-cls">${name}</span>`);
+      escaped = escaped.replace(/<span class="tok-kw">def<\/span> (\w+)/g, (m, name) => `<span class="tok-kw">def</span> <span class="tok-def">${name}</span>`);
+      let commentEscaped = commentPart.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      return escaped + (commentEscaped ? `<span class="tok-com">${commentEscaped}</span>` : '');
+    }).join('\n');
+  }
+  document.querySelectorAll('code[data-lang="py"]').forEach(block => {
+    block.innerHTML = highlight(block.textContent);
+  });
+</script>
+
+</body>
+</html>
